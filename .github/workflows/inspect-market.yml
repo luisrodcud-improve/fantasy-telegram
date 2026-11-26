@@ -10,31 +10,24 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Test public reader access to market
+      - name: Check market pagination and player rows
         run: |
           python - <<'PY'
-          import requests
-          from urllib.parse import quote
-
-          target = "https://www.analiticafantasy.com/fantasy-la-liga/mercado"
-          urls = [
-              "https://r.jina.ai/http://" + target.removeprefix("https://"),
-              "https://r.jina.ai/http://" + target.removeprefix("https://") + "?page=2",
-              "https://r.jina.ai/http://" + target.removeprefix("https://") + "?page=2&limit=10",
-              "https://r.jina.ai/http://" + target.removeprefix("https://") + "?pagina=2",
-              "https://r.jina.ai/http://" + target.removeprefix("https://") + "?pageIndex=1",
-          ]
-          headers = {"User-Agent": "Mozilla/5.0", "Accept": "text/plain"}
-          for url in urls:
+          import requests, re
+          base = "https://r.jina.ai/http://www.analiticafantasy.com/fantasy-la-liga/mercado"
+          headers = {"User-Agent": "Mozilla/5.0", "Accept": "text/plain", "x-no-cache": "true"}
+          for params in ("?page=1&limit=10", "?page=2&limit=10", "?page=3&limit=10", "?pageIndex=0&limit=10", "?pageIndex=1&limit=10", "?pagina=1", "?pagina=2"):
+              url = base + params
               try:
                   response = requests.get(url, headers=headers, timeout=45)
-                  body = response.text
-                  print("\\nURL", url)
-                  print("STATUS", response.status_code, "BYTES", len(body))
-                  print("START", body[:700].replace("\\n", " ") )
-                  for term in ("596 jugadores", "Página", "Última actualización", "403 Forbidden", "Pedri"):
-                      pos = body.lower().find(term.lower())
-                      print("TERM", term, pos)
+                  text = response.text
+                  print("\\n===== PARAMS", params, "STATUS", response.status_code, "BYTES", len(text), "=====")
+                  lines = [line.strip() for line in text.splitlines() if line.strip()]
+                  for line in lines:
+                      low = line.lower()
+                      if any(x in low for x in ("€", "subida", "bajada", "valor", "pedri", "mbapp", "jugadores", "página")):
+                          print(line[:500])
+                  print("PLAYER_LIKE_LINES", sum(1 for line in lines if re.search(r"€|\\+\\s*\\d|\\d+\\s*%", line)))
               except Exception as exc:
-                  print("REQUEST_ERROR", url, repr(exc))
+                  print("ERROR", params, repr(exc))
           PY
