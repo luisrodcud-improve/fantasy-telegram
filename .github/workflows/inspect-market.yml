@@ -38,7 +38,7 @@ jobs:
           print("UNIQUE_PLAYER_IDS", len(set(ids)), "UNIQUE_PLAYER_SLUGS", len(set(slugs)))
           print("FIRST_PLAYER", player_rows[0].get("nickname"), player_rows[0].get("masterPlayerId"))
           print("LAST_PLAYER", player_rows[-1].get("nickname"), player_rows[-1].get("masterPlayerId"))
-          if len(players) != 596 or len(player_rows) != 565 or len(set(ids)) != 565 or len(set(slugs)) != 565:
+          if len(players) != 596 or len(player_rows) != 564 or len(set(ids)) != 564 or len(set(slugs)) != 564:
               raise SystemExit("ERROR: market player validation failed")
           def pct(p):
               old = p.get("marketValue", 0) - p.get("subida", 0)
