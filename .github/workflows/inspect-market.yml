@@ -14,7 +14,6 @@ jobs:
         run: |
           python - <<'PY'
           import requests, re
-          from urllib.parse import quote
           target = "http://www.analiticafantasy.com/fantasy-la-liga/mercado"
           urls = [
               ("reader_html", "https://r.jina.ai/" + target),
@@ -30,12 +29,13 @@ jobs:
                   body = r.text
                   print("\\n==", label, "status", r.status_code, "bytes", len(body), "final", r.url, "==")
                   print("CONTENT_TYPE", r.headers.get("content-type"))
-                  for pat in [
-                      r'<script[^>]+src=["\\']([^"\\']+)',
-                      r'<link[^>]+href=["\\']([^"\\']+)',
-                      r'.{0,100}(?:Página 1 de 60|Siguiente|pagination|pageIndex|pageSize|596 jugadores).{0,180}',
-                      r'.{0,100}(?:__NEXT_DATA__|__NUXT__|__INITIAL_STATE__|__APOLLO_STATE__).{0,180}',
-                  ]:
+                  patterns = [
+                      '<script[^>]+src="([^"]+)',
+                      '<link[^>]+href="([^"]+)',
+                      '.{0,100}(?:Página 1 de 60|Siguiente|pagination|pageIndex|pageSize|596 jugadores).{0,180}',
+                      '.{0,100}(?:__NEXT_DATA__|__NUXT__|__INITIAL_STATE__|__APOLLO_STATE__).{0,180}',
+                  ]
+                  for pat in patterns:
                       matches = re.findall(pat, body, re.I|re.S)
                       print("PATTERN", pat, "COUNT", len(matches))
                       for m in matches[:35]:
