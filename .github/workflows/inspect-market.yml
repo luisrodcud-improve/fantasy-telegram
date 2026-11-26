@@ -10,39 +10,34 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Find the market pagination action in public app code
+      - name: Extract and validate all embedded market players
         run: |
           python - <<'PY'
-          import requests, re
-          from urllib.parse import urljoin
-          base = "https://www.analiticafantasy.com"
-          reader = requests.get("https://r.jina.ai/http://www.analiticafantasy.com/fantasy-la-liga/mercado",
-                                headers={"User-Agent":"Mozilla/5.0","X-Return-Format":"html"}, timeout=60)
-          html = reader.text
-          print("HTML_STATUS", reader.status_code, "BYTES", len(html))
-          for term in ("tablaData", "initialPlayers", "setPage", "currentPage", "pageSize"):
-              positions = [m.start() for m in re.finditer(re.escape(term), html, re.I)]
-              print("\\nHTML_TERM", term, "COUNT", len(positions))
-              for pos in positions[:4]:
-                  print("HTML_CONTEXT", re.sub(r"\\s+", " ", html[max(0,pos-500):pos+1100])[:1600])
-          scripts = re.findall(r'<script[^>]+src="([^"]+)', html, re.I)
-          print("\\nSCRIPT_COUNT", len(scripts))
-          needles = ("initialPlayers", "tablaData", "setCurrentPage", "setPage", "pageSize",
-                     "currentPage", "pagination", "mercado", "fetch(", "axios", "/api/")
-          for src in scripts:
-              url = urljoin(base, src)
-              try:
-                  resp = requests.get(url, headers={"User-Agent":"Mozilla/5.0"}, timeout=25)
-                  js = resp.text
-                  found = [n for n in needles if n.lower() in js.lower()]
-                  if not found:
-                      continue
-                  print("\\nASSET", url, "STATUS", resp.status_code, "BYTES", len(js), "HITS", found)
-                  for needle in found:
-                      match = re.search(re.escape(needle), js, re.I)
-                      if match:
-                          pos = match.start()
-                          print("JS_CONTEXT", needle, re.sub(r"\\s+", " ", js[max(0,pos-350):pos+900])[:1250])
-              except Exception as exc:
-                  print("ASSET_ERROR", url, repr(exc))
+          import requests, re, json
+          url = "https://r.jina.ai/http://www.analiticafantasy.com/fantasy-la-liga/mercado"
+          r = requests.get(url, headers={"User-Agent":"Mozilla/5.0","X-Return-Format":"html"}, timeout=90)
+          print("READER_STATUS", r.status_code, "HTML_BYTES", len(r.text))
+          r.raise_for_status()
+          match = re.search(r'"initialPlayers":', r.text)
+          if not match:
+              raise SystemExit("ERROR: initialPlayers not found in rendered page")
+          start = r.text.find("[", match.end())
+          players, end = json.JSONDecoder().raw_decode(r.text[start:])
+          ids = [p.get("masterPlayerId") for p in players]
+          unique = len(set(ids))
+          print("PLAYERS_EXTRACTED", len(players))
+          print("UNIQUE_PLAYER_IDS", unique)
+          print("FIRST_PLAYER", players[0].get("nickname"), players[0].get("masterPlayerId"))
+          print("LAST_PLAYER", players[-1].get("nickname"), players[-1].get("masterPlayerId"))
+          if len(players) != 596 or unique != 596:
+              raise SystemExit("ERROR: expected 596 distinct players")
+          def pct(p):
+              old = p.get("marketValue", 0) - p.get("subida", 0)
+              return (p.get("subida", 0) / old * 100) if old > 0 else 0
+          top = sorted((p for p in players if (p.get("subida") or 0) > 0),
+                       key=lambda p: p["subida"], reverse=True)[:30]
+          print("TOP30_COUNT", len(top))
+          for i, p in enumerate(top, 1):
+              print(f"{i:02d}. {p.get('nickname')} | +{p.get('subida')} EUR | {pct(p):.2f}% | id={p.get('masterPlayerId')}")
+          print("VALIDATION_OK")
           PY
