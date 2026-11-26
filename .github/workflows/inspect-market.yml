@@ -29,21 +29,21 @@ jobs:
           payload = r.text[start:].replace(chr(92) + '"', '"')
           players, end = json.JSONDecoder().raw_decode(payload)
           from collections import Counter
-          ids = [p.get("masterPlayerId") for p in players]
-          slugs = [p.get("playerSlug") for p in players]
-          dup_ids = [(k,v) for k,v in Counter(ids).items() if v > 1]
-          print("PLAYERS_EXTRACTED", len(players))
-          print("UNIQUE_MASTER_IDS", len(set(ids)), "REPEATED_IDS", len(dup_ids))
-          print("UNIQUE_PLAYER_SLUGS", len(set(slugs)))
-          print("DUPLICATE_EXAMPLES", [(p.get("nickname"),p.get("masterPlayerId"),p.get("playerSlug")) for p in players if p.get("masterPlayerId") in {x[0] for x in dup_ids}][:20])
-          print("FIRST_PLAYER", players[0].get("nickname"), players[0].get("masterPlayerId"))
-          print("LAST_PLAYER", players[-1].get("nickname"), players[-1].get("masterPlayerId"))
-          if len(players) != 596 or len(set(slugs)) != 596:
-              raise SystemExit("ERROR: player count or slugs are not unique")
+          player_rows = [p for p in players if p.get("masterPlayerId") is not None and p.get("playerSlug")]
+          coaches = [p for p in players if p.get("masterPlayerId") is None]
+          ids = [p.get("masterPlayerId") for p in player_rows]
+          slugs = [p.get("playerSlug") for p in player_rows]
+          print("TOTAL_MARKET_ROWS", len(players))
+          print("PLAYER_ROWS", len(player_rows), "COACH_ROWS", len(coaches))
+          print("UNIQUE_PLAYER_IDS", len(set(ids)), "UNIQUE_PLAYER_SLUGS", len(set(slugs)))
+          print("FIRST_PLAYER", player_rows[0].get("nickname"), player_rows[0].get("masterPlayerId"))
+          print("LAST_PLAYER", player_rows[-1].get("nickname"), player_rows[-1].get("masterPlayerId"))
+          if len(players) != 596 or len(player_rows) != 565 or len(set(ids)) != 565 or len(set(slugs)) != 565:
+              raise SystemExit("ERROR: market player validation failed")
           def pct(p):
               old = p.get("marketValue", 0) - p.get("subida", 0)
               return (p.get("subida", 0) / old * 100) if old > 0 else 0
-          top = sorted((p for p in players if (p.get("subida") or 0) > 0),
+          top = sorted((p for p in player_rows if (p.get("subida") or 0) > 0),
                        key=lambda p: p["subida"], reverse=True)[:30]
           print("TOP30_COUNT", len(top))
           for i, p in enumerate(top, 1):
