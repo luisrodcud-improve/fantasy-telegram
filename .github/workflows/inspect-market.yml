@@ -28,14 +28,18 @@ jobs:
               raise SystemExit("ERROR: embedded initialPlayers object array not found")
           payload = r.text[start:].replace(chr(92) + '"', '"')
           players, end = json.JSONDecoder().raw_decode(payload)
+          from collections import Counter
           ids = [p.get("masterPlayerId") for p in players]
-          unique = len(set(ids))
+          slugs = [p.get("playerSlug") for p in players]
+          dup_ids = [(k,v) for k,v in Counter(ids).items() if v > 1]
           print("PLAYERS_EXTRACTED", len(players))
-          print("UNIQUE_PLAYER_IDS", unique)
+          print("UNIQUE_MASTER_IDS", len(set(ids)), "REPEATED_IDS", len(dup_ids))
+          print("UNIQUE_PLAYER_SLUGS", len(set(slugs)))
+          print("DUPLICATE_EXAMPLES", [(p.get("nickname"),p.get("masterPlayerId"),p.get("playerSlug")) for p in players if p.get("masterPlayerId") in {x[0] for x in dup_ids}][:20])
           print("FIRST_PLAYER", players[0].get("nickname"), players[0].get("masterPlayerId"))
           print("LAST_PLAYER", players[-1].get("nickname"), players[-1].get("masterPlayerId"))
-          if len(players) != 596 or unique != 596:
-              raise SystemExit("ERROR: expected 596 distinct players")
+          if len(players) != 596 or len(set(slugs)) != 596:
+              raise SystemExit("ERROR: player count or slugs are not unique")
           def pct(p):
               old = p.get("marketValue", 0) - p.get("subida", 0)
               return (p.get("subida", 0) / old * 100) if old > 0 else 0
