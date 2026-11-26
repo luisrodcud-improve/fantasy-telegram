@@ -10,36 +10,41 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect rendered HTML and pagination controls
+      - name: Find the market pagination action in public app code
         run: |
           python - <<'PY'
           import requests, re
-          target = "http://www.analiticafantasy.com/fantasy-la-liga/mercado"
-          urls = [
-              ("reader_html", "https://r.jina.ai/" + target),
-              ("reader_encoded_page2", "https://r.jina.ai/" + target + "%3Fpage%3D2"),
-          ]
-          for label, url in urls:
+          from urllib.parse import urljoin
+          base = "https://www.analiticafantasy.com"
+          reader = requests.get("https://r.jina.ai/http://www.analiticafantasy.com/fantasy-la-liga/mercado",
+                                headers={"User-Agent":"Mozilla/5.0","X-Return-Format":"html"}, timeout=60)
+          html = reader.text
+          print("HTML_STATUS", reader.status_code, "BYTES", len(html))
+          for term in ("tablaData", "initialPlayers", "setPage", "currentPage", "pageSize"):
+              positions = [m.start() for m in re.finditer(re.escape(term), html, re.I)]
+              print("\\nHTML_TERM", term, "COUNT", len(positions))
+              for pos in positions[:4]:
+                  print("HTML_CONTEXT", re.sub(r"\\s+", " ", html[max(0,pos-500):pos+1100])[:1600])
+          scripts = re.findall(r'<script[^>]+src="([^"]+)', html, re.I)
+          print("\\nSCRIPT_COUNT", len(scripts))
+          needles = ("initialPlayers", "tablaData", "setCurrentPage", "setPage", "pageSize",
+                     "currentPage", "pagination", "mercado", "fetch(", "axios", "/api/")
+          for src in scripts:
+              url = urljoin(base, src)
               try:
-                  r = requests.get(url, headers={
-                      "User-Agent": "Mozilla/5.0",
-                      "X-Return-Format": "html",
-                      "X-With-Generated-Alt": "false",
-                  }, timeout=60)
-                  body = r.text
-                  print("\\n==", label, "status", r.status_code, "bytes", len(body), "final", r.url, "==")
-                  print("CONTENT_TYPE", r.headers.get("content-type"))
-                  patterns = [
-                      '<script[^>]+src="([^"]+)',
-                      '<link[^>]+href="([^"]+)',
-                      '.{0,100}(?:Página 1 de 60|Siguiente|pagination|pageIndex|pageSize|596 jugadores).{0,180}',
-                      '.{0,100}(?:__NEXT_DATA__|__NUXT__|__INITIAL_STATE__|__APOLLO_STATE__).{0,180}',
-                  ]
-                  for pat in patterns:
-                      matches = re.findall(pat, body, re.I|re.S)
-                      print("PATTERN", pat, "COUNT", len(matches))
-                      for m in matches[:35]:
-                          print("MATCH", re.sub(r"\\s+", " ", str(m))[:450])
-              except Exception as e:
-                  print("ERROR", label, repr(e))
+                  resp = requests.get(url, headers={"User-Agent":"Mozilla/5.0"}, timeout=25)
+                  js = resp.text
+                  found = [n for n in needles if n.lower() in js.lower()]
+                  if not found:
+                      continue
+                  print("\\nASSET", url, "STATUS", resp.status_code, "BYTES", len(js), "HITS", found)
+                  for needle in found:
+                      match = re.search(re.escape(needle), js, re.I)
+                      if match:
+                          pos = match.start()
+                          print("JS_CONTEXT", needle, re.sub(r"\\s+", " ", js[max(0,pos-350):pos+900])[:1250])
+                  for match in re.findall(r'["\\']([^"\\']{0,180}(?:/api/|mercado|players|jugadores)[^"\\']{0,180})["\\']', js, re.I):
+                      print("JS_ROUTE", match[:350])
+              except Exception as exc:
+                  print("ASSET_ERROR", url, repr(exc))
           PY
