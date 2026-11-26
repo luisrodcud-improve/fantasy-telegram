@@ -26,7 +26,8 @@ jobs:
                   break
           if start is None:
               raise SystemExit("ERROR: embedded initialPlayers object array not found")
-          players, end = json.JSONDecoder().raw_decode(r.text[start:])
+          payload = r.text[start:].replace('\\\\"', '"')
+          players, end = json.JSONDecoder().raw_decode(payload)
           ids = [p.get("masterPlayerId") for p in players]
           unique = len(set(ids))
           print("PLAYERS_EXTRACTED", len(players))
