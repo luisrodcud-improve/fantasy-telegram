@@ -15,27 +15,33 @@ jobs:
           python - <<'PY'
           import re, requests
           from urllib.parse import urljoin
+
           url = "https://www.analiticafantasy.com/fantasy-la-liga/mercado"
-          r = requests.get(url, timeout=30, headers={"User-Agent":"Mozilla/5.0"})
+          r = requests.get(url, timeout=30, headers={"User-Agent": "Mozilla/5.0"})
           print("STATUS", r.status_code, "FINAL_URL", r.url, "HTML_BYTES", len(r.text))
-          print("TITLE", re.search(r"<title[^>]*>(.*?)</title>", r.text, re.I|re.S).group(1).strip() if re.search(r"<title[^>]*>(.*?)</title>", r.text, re.I|re.S) else "missing")
+          title_match = re.search(r"<title[^>]*>(.*?)</title>", r.text, re.I | re.S)
+          print("TITLE", title_match.group(1).strip() if title_match else "missing")
+
           scripts = re.findall(r'<script[^>]+src=["\']([^"\']+)', r.text, re.I)
           print("SCRIPT_COUNT", len(scripts))
           for src in scripts:
               jsurl = urljoin(url, src)
               try:
-                  j = requests.get(jsurl, timeout=20, headers={"User-Agent":"Mozilla/5.0"})
-                  text = j.text
-                  hits = []
-                  for term in ("market", "mercado", "pagination", "pageSize", "pageIndex", "players"):
-                      if term.lower() in text.lower(): hits.append(term)
+                  j = requests.get(jsurl, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
+                  js_text = j.text
+                  hits = [term for term in ("market", "mercado", "pagination", "pageSize", "pageIndex", "players") if term.lower() in js_text.lower()]
                   if hits:
-                      print("ASSET", jsurl, "STATUS", j.status_code, "BYTES", len(text), "HITS", ",".join(hits))
-                      for pattern in (r"https?[^\\"' ]{0,180}(?:api|market|mercado)[^\\"' ]{0,180}", r"\b(?:pageSize|pageIndex|pagination|totalPages)\b"):
-                          matches = re.findall(pattern, text, re.I)
-                          for m in matches[:12]: print("MATCH", m[:350])
+                      print("ASSET", jsurl, "STATUS", j.status_code, "BYTES", len(js_text), "HITS", ",".join(hits))
+                      patterns = (
+                          r"https?[^ ]{0,180}(?:api|market|mercado)[^ ]{0,180}",
+                          r"\b(?:pageSize|pageIndex|pagination|totalPages)\b",
+                      )
+                      for pattern in patterns:
+                          for match in re.findall(pattern, js_text, re.I)[:12]:
+                              print("MATCH", match[:350])
               except Exception as e:
                   print("ASSET_ERROR", jsurl, repr(e))
+
           print("HTML_MARKET_TERMS")
           for term in ("__NEXT_DATA__", "api/", "mercado", "pagination", "596"):
               print(term, r.text.lower().find(term.lower()))
