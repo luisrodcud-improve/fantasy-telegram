@@ -18,10 +18,14 @@ jobs:
           r = requests.get(url, headers={"User-Agent":"Mozilla/5.0","X-Return-Format":"html"}, timeout=90)
           print("READER_STATUS", r.status_code, "HTML_BYTES", len(r.text))
           r.raise_for_status()
-          match = re.search(r"initialPlayers", r.text)
-          if not match:
-              raise SystemExit("ERROR: initialPlayers not found in rendered page")
-          start = r.text.find("[", match.end())
+          start = None
+          for match in re.finditer("initialPlayers", r.text):
+              candidate = r.text.find("[", match.end())
+              if candidate >= 0 and r.text[candidate+1:candidate+2] == "{":
+                  start = candidate
+                  break
+          if start is None:
+              raise SystemExit("ERROR: embedded initialPlayers object array not found")
           players, end = json.JSONDecoder().raw_decode(r.text[start:])
           ids = [p.get("masterPlayerId") for p in players]
           unique = len(set(ids))
