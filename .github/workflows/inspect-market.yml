@@ -43,8 +43,6 @@ jobs:
                       if match:
                           pos = match.start()
                           print("JS_CONTEXT", needle, re.sub(r"\\s+", " ", js[max(0,pos-350):pos+900])[:1250])
-                  for match in re.findall(r'["\\']([^"\\']{0,180}(?:/api/|mercado|players|jugadores)[^"\\']{0,180})["\\']', js, re.I):
-                      print("JS_ROUTE", match[:350])
               except Exception as exc:
                   print("ASSET_ERROR", url, repr(exc))
           PY
